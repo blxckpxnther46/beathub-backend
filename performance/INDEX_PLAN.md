@@ -1,4 +1,8 @@
-# BeatHub Index Strategy
+# 📊 BeatHub Index Strategy & Optimization Plan
+
+## Overview
+
+This document outlines the comprehensive indexing strategy for BeatHub, based on actual query patterns and performance requirements.
 
 ## Phase 1: Query Pattern Identification
 
@@ -71,9 +75,45 @@ No. Each index maps to a critical query pattern. Redundant indexes (like `{ genr
 ---
 
 ### 3. Which index is most critical to application survival?
-`{ genre: 1, duration: -1 }` is most critical. The “Trending Songs” or filtered browsing experience depends on it. Without this index, the system would perform full collection scans and in-memory sorting under heavy traffic, causing severe latency.
+`{ genre: 1, duration: -1 }` is most critical. The "Trending Songs" or filtered browsing experience depends on it. Without this index, the system would perform full collection scans and in-memory sorting under heavy traffic, causing severe latency.
 
 ---
 
 ### 4. Which index would you remove first if RAM became expensive?
 `{ loginCount: 1 }` would be removed first. While useful for analytics, it is not part of core user-facing flows. Removing it reduces memory usage with minimal impact on critical operations.
+
+---
+
+## Phase 5: Index Maintenance Plan
+
+### Monitoring
+
+```bash
+# Check index size and usage
+db.songs.aggregate([{ $indexStats: {} }])
+
+# Monitor slow queries
+db.setProfilingLevel(1, { slowms: 100 })
+db.system.profile.find({ millis: { $gt: 100 } })
+```
+
+### Maintenance Schedule
+
+- **Weekly:** Review slow query logs
+- **Monthly:** Analyze index usage statistics
+- **Quarterly:** Rebuild fragmented indexes
+- **Yearly:** Review strategy based on growth
+
+### Optimization Tips
+
+✅ Use ESR Rule for compound indexes (Equality → Sort → Range)  
+✅ Order sort fields by direction (all ascending or descending together)  
+✅ Avoid indexing low-cardinality fields  
+✅ Drop unused indexes to improve write performance  
+✅ Monitor index size growth  
+
+---
+
+## Conclusion
+
+This indexing strategy balances read and write performance for BeatHub's current workload. The chosen indexes will significantly improve query performance while maintaining acceptable write latency.
