@@ -1,0 +1,136 @@
+/**
+ * Database Seed Script
+ * 
+ * Purpose: Populate database with sample data for testing and development.
+ * 
+ * Data Generated:
+ * - 30 Artists with genres
+ * - 100 Albums with random artists
+ * - 2000 Songs with random artists/albums
+ * - 200 Users with hashed passwords
+ * - 400 Playlists with random users and songs
+ * 
+ * Usage: npm run seed
+ * Note: Clears existing data before seeding
+ */
+
+require('dotenv').config();
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+
+const Artist = require('../models/Artists');
+const Album = require('../models/Album');
+const Song = require('../models/Song');
+const User = require('../models/User');
+const Playlist = require('../models/Playlist');
+
+const genres = ['Pop', 'Rock', 'Electronic', 'Hip Hop', 'Jazz'];
+
+/**
+ * Helper function to select random item from array
+ */
+function randomItem(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+/**
+ * Main seed function - connects to DB and populates with sample data
+ */
+async function seed() {
+  try {
+    await mongoose.connect(process.env.MONGO_URI);
+    console.log('Connected to MongoDB');
+
+    // Clear all existing data
+    await Promise.all([
+      Artist.deleteMany({}),
+      Album.deleteMany({}),
+      Song.deleteMany({}),
+      User.deleteMany({}),
+      Playlist.deleteMany({})
+    ]);
+    console.log('✓ Old data cleared');
+
+    // Step 1: Create Artists
+    const artistData = [];
+    for (let i = 0; i < 30; i++) {
+      artistData.push({
+        name: `Artist_${i}`,
+        genre: randomItem(genres),
+        bio: `Bio for artist ${i}`
+      });
+    }
+    const artists = await Artist.insertMany(artistData);
+    console.log(`✓ Created ${artists.length} artists`);
+
+    // Step 2: Create Albums
+    const albumData = [];
+    for (let i = 0; i < 100; i++) {
+      albumData.push({
+        title: `Album_${i}`,
+        releaseYear: 2000 + (i % 24),
+        artist: randomItem(artists)._id
+      });
+    }
+    const albums = await Album.insertMany(albumData);
+    console.log(`✓ Created ${albums.length} albums`);
+
+    // Step 3: Create Songs
+    const songData = [];
+    for (let i = 0; i < 2000; i++) {
+      songData.push({
+        title: `Song_${i}`,
+        duration: Math.floor(Math.random() * 400),
+        genre: randomItem(genres),
+        releaseYear: 2000 + (i % 24),
+        artist: randomItem(artists)._id,
+        album: randomItem(albums)._id
+      });
+    }
+    const songs = await Song.insertMany(songData);
+    console.log(`✓ Created ${songs.length} songs`);
+
+    // Step 4: Create Users
+    const userData = [];
+    const salt = await bcrypt.genSalt(10);
+    for (let i = 0; i < 200; i++) {
+      const hashedPassword = await bcrypt.hash('password123', salt);
+      userData.push({
+        username: `user_${i}`,
+        email: `user${i}@example.com`,
+        password: hashedPassword,
+        loginCount: Math.floor(Math.random() * 100)
+      });
+    }
+    const users = await User.insertMany(userData);
+    console.log(`✓ Created ${users.length} users`);
+
+    // Step 5: Create Playlists
+    const playlistData = [];
+    for (let i = 0; i < 400; i++) {
+      const randomSongs = [];
+      for (let j = 0; j < 15; j++) {
+        randomSongs.push(randomItem(songs)._id);
+      }
+
+      playlistData.push({
+        name: `Playlist_${i}`,
+        description: 'Auto generated playlist',
+        user: randomItem(users)._id,
+        songs: randomSongs
+      });
+    }
+
+    await Playlist.insertMany(playlistData);
+    console.log(`✓ Created ${playlistData.length} playlists`);
+
+    console.log('\n✅ Database seeded successfully!');
+    process.exit(0);
+
+  } catch (err) {
+    console.error(err);
+    process.exit(1);
+  }
+}
+
+seed();
