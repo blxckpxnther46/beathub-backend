@@ -1,0 +1,93 @@
+/**
+ * Authentication Controller
+ * Handles user registration and login operations.
+ * 
+ * Features:
+ * - User registration with password hashing
+ * - User login with JWT token generation
+ * - Login count tracking
+ * - Password validation and comparison
+ * - Error handling and security checks
+ */
+
+const User = require('../models/User');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+
+/**
+ * Register a new user
+ * Validates email and username uniqueness, hashes password, and creates user account
+ */
+exports.registerUser = async (req, res) => {
+  try {
+    const { username, email, password } = req.body;
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ $or: [{ email }, { username }] });
+    if (existingUser) {
+      return res.status(400).json({ success: false, message: 'User already exists' });
+    }
+
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Create user
+    const newUser = new User({
+      username,
+      email,
+      password: hashedPassword
+    });
+
+    await newUser.save();
+
+    res.status(201).json({ success: true, message: 'User registered successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Registration failed', error: error.message });
+  }
+};
+
+/**
+ * Login an existing user
+ * Validates credentials, generates JWT token, and increments login count
+ */
+exports.loginUser = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // 1. Find user by email
+    const user = await User.findOne({ email });
+    
+    // Check if user exists
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'Invalid email or password' });
+    }
+
+    // 2. Compare passwords
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: 'Invalid email or password' });
+    }
+
+    // 3. Generate JWT
+    const token = jwt.sign({ id: user._id, username: user.username }, process.env.JWT_SECRET || 'secret', { expiresIn: '1h' });
+
+    // Step 4: Update login count
+    await User.findByIdAndUpdate(user._id, { $inc: { loginCount: 1 } });
+
+    // Step 5: Send response
+res.status(200).json({
+  success: true,
+  data: {
+    token,
+    user: {
+      id: user._id,
+      username: user.username,
+      role: user.role // <--- Add this line
+    }
+  }
+});
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Login failed', error: error.message });
+  }
+};
