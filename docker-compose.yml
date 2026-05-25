@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+    ports:
+      - "3000:5000"
+    environment:
+      - MONGO_URI=mongodb://db:27017/beathub_test
+      - NODE_ENV=production
+    depends_on:
+      - db
+    networks:
+      - beathub-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:5000', (r) => {if (r.statusCode !== 404) throw new Error(r.statusCode)})"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  db:
+    image: mongo:6
+    ports:
+      - "27017:27017"
+    volumes:
+      - db-data:/data/db
+    networks:
+      - beathub-network
+    restart: unless-stopped
+    environment:
+      - MONGO_INITDB_DATABASE=beathub_test
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  db-data:
+    driver: local
+
+networks:
+  beathub-network:
+    driver: bridge

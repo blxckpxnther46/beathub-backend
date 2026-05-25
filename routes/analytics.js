@@ -36,7 +36,7 @@ const userActivityPipeline = require('../aggregations/user-activity');
  *       500:
  *         description: Server error
  */
-router.get('/top-artists', authenticate, async (req, res) => {
+router.get('/top-artists', authenticate, authorize('admin'), async (req, res) => {
   try {
     // Execute the pipeline on the Song model
     const results = await Song.aggregate(topArtistsPipeline);

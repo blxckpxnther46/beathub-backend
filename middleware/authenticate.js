@@ -6,7 +6,7 @@
  * - Extracts JWT from Authorization header
  * - Verifies token validity and expiration
  * - Fetches user data and attaches to req.user
- * - Returns detailed error messages for debugging
+ * - Returns detailed error messages for different JWT errors
  * 
  * Usage: Use as middleware on protected routes
  * Example: router.get('/protected', authenticate, controller)
@@ -22,7 +22,7 @@ const authenticate = async (req, res, next) => {
   try {
     let token;
 
-    // 1. Extract token
+    // 1. Extract token from Authorization header
     if (
       req.headers.authorization &&
       req.headers.authorization.startsWith('Bearer')
@@ -30,7 +30,7 @@ const authenticate = async (req, res, next) => {
       token = req.headers.authorization.split(' ')[1];
     }
 
-    // 2. No token → reject
+    // 2. Check if token exists
     if (!token) {
       return res.status(401).json({
         success: false,
@@ -39,10 +39,27 @@ const authenticate = async (req, res, next) => {
     }
 
     // 3. Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (jwtError) {
+      // Handle specific JWT errors
+      if (jwtError.name === 'TokenExpiredError') {
+        return res.status(401).json({
+          success: false,
+          message: 'Your token has expired. Please log in again.'
+        });
+      } else if (jwtError.name === 'JsonWebTokenError') {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid token. Please log in again.'
+        });
+      }
+      throw jwtError;
+    }
 
-    // 4. Fetch FULL user (IMPORTANT: ensure role is included)
-    const currentUser = await User.findById(decoded.id).select('+password role');
+    // 4. Fetch user from database
+    const currentUser = await User.findById(decoded.id);
 
     if (!currentUser) {
       return res.status(401).json({
@@ -51,16 +68,8 @@ const authenticate = async (req, res, next) => {
       });
     }
 
-    // 🔥 DEBUG (remove later)
-    console.log("AUTH USER:", {
-      id: currentUser._id,
-      email: currentUser.email,
-      role: currentUser.role
-    });
-
-    // 5. Attach user
+    // 5. Attach user to request
     req.user = currentUser;
-
     next();
 
   } catch (error) {

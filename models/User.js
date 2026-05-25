@@ -31,7 +31,8 @@ const userSchema = new mongoose.Schema(
 
   password: {
     type: String,
-    required: true
+    required: true,
+    select: false
   },
 
     // --- NEW FIELD START ---
@@ -59,10 +60,15 @@ const userSchema = new mongoose.Schema(
 }
 );
 
-userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
-  this.password = await bcrypt.hash(this.password, 10);
-  next();
+userSchema.pre('save', async function() {
+  // Only hash password if it has been modified or is new
+  if (!this.isModified('password')) {
+    return;
+  }
+  
+  // Hash password with salt rounds of 10
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
 });
 
 userSchema.methods.comparePassword = async function(candidatePassword) {

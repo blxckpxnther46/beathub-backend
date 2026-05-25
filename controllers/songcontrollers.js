@@ -13,12 +13,58 @@
 
 const Song = require('../models/Song');
 const mongoose = require('mongoose');
+const { encodeCursor, decodeCursor } = require('../utils/cursor');
 
 /**
  * GET - Retrieve all songs from the database
+ * Supports cursor-based pagination when limit or cursor parameters are provided
  */
 const getAllSongs = async (req, res) => {
   try {
+    // Check if pagination parameters are provided
+    const limit = req.query.limit ? Math.min(parseInt(req.query.limit), 100) : null;
+    const encodedCursor = req.query.cursor;
+
+    // If pagination is requested, use cursor-based pagination
+    if (limit || encodedCursor) {
+      let cursor = null;
+
+      if (encodedCursor) {
+        cursor = decodeCursor(encodedCursor);
+      }
+
+      const query = cursor ? { _id: { $lt: cursor } } : {};
+
+      const songs = await Song.find(query)
+        .sort({ _id: -1 })
+        .limit(limit ? limit + 1 : 11)
+        .lean();
+
+      const actualLimit = limit || 10;
+      const hasMore = songs.length > actualLimit;
+
+      if (hasMore) {
+        songs.pop();
+      }
+
+      const nextCursor =
+        hasMore && songs.length > 0
+          ? encodeCursor(songs[songs.length - 1]._id)
+          : null;
+
+      return res.status(200).json({
+        success: true,
+        data: songs,
+        pagination: {
+          nextCursor,
+          hasMore,
+          limit: actualLimit,
+          count: songs.length
+        }
+      });
+    }
+
+    // Default: return all songs without pagination
     const songs = await Song.find();
     return res.status(200).json(songs);
   } catch (error) {

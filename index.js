@@ -44,7 +44,7 @@ app.use('/api/analytics', analyticsRouter); // Analytics and aggregations
 app.use('/api', paginatedSongRoutes);      // Paginated song routes
 
 // Start Server
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🎵 BeatHub Server running on port ${PORT}`);
 });
